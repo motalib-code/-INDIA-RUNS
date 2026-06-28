@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment
+.env
+
+# Models (large files - download separately)
+models/
+
+# Generated indices
+data/faiss_index*
+data/bm25_index*
+data/metadata.json
+data/processed/
+
+# Upload artifacts
+_upload_jd.pdf
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
