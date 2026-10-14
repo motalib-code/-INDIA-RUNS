@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Intelligent Examination Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="app()">
+
+    <!-- Navigation Header -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                <h1 class="text-xl font-bold">ExamAI Proctor & Analytics Platform</h1>
+            </div>
+            <div class="flex items-center space-x-4" x-show="token">
+                <span class="text-sm bg-indigo-700 px-3 py-1 rounded-full" x-text="'Role: ' + role.toUpperCase()"></span>
+                <span class="text-sm font-medium" x-text="'User: ' + username"></span>
+                <button @click="logout()" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded text-sm font-semibold transition">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+
+        <!-- AUTH VIEW -->
+        <template x-if="!token">
+            <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-center text-gray-800 mb-6" x-text="isRegister ? 'Create Account' : 'Sign In to ExamAI'"></h2>
+
+                <div class="space-y-4">
+                    <div x-show="isRegister">
+                        <label class="block text-sm font-medium text-gray-700">Username</label>
+                        <input type="text" x-model="authForm.username" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700" x-text="isRegister ? 'Email' : 'Username or Email'"></label>
+                        <input type="text" x-model="authForm.loginId" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" x-model="authForm.password" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div x-show="isRegister">
+                        <label class="block text-sm font-medium text-gray-700">Role</label>
+                        <select x-model="authForm.role" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white">
+                            <option value="student">Student</option>
+                            <option value="examiner">Examiner / Admin</option>
+                        </select>
+                    </div>
+
+                    <div x-show="errorMessage" class="bg-red-50 text-red-600 p-3 rounded-lg text-sm" x-text="errorMessage"></div>
+
+                    <button @click="submitAuth()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition" x-text="isRegister ? 'Register' : 'Sign In'"></button>
+
+                    <div class="text-center mt-4">
+                        <button @click="isRegister = !isRegister; errorMessage = ''" class="text-sm text-indigo-600 hover:underline" x-text="isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'"></button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- DASHBOARD VIEW (AUTHENTICATED) -->
+        <template x-if="token">
+            <div>
+                <!-- ROLE TABS -->
+                <div class="flex space-x-4 mb-6 border-b pb-3" x-show="role === 'examiner' || role === 'admin'">
+                    <button @click="activeTab = 'questions'" :class="activeTab === 'questions' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500'" class="border-b-2 pb-2 px-1 text-sm transition">Question Bank</button>
+                    <button @click="activeTab = 'exams'" :class="activeTab === 'exams' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500'" class="border-b-2 pb-2 px-1 text-sm transition">Exam Management</button>
+                    <button @click="activeTab = 'grading'" :class="activeTab === 'grading' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500'" class="border-b-2 pb-2 px-1 text-sm transition">AI Subjective Grading Queue</button>
+                </div>
+
+                <div class="flex space-x-4 mb-6 border-b pb-3" x-show="role === 'student'">
+                    <button @click="activeTab = 'student_exams'" :class="activeTab === 'student_exams' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500'" class="border-b-2 pb-2 px-1 text-sm transition">Available Exams</button>
+                    <button @click="activeTab = 'student_results'" :class="activeTab === 'student_results' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500'" class="border-b-2 pb-2 px-1 text-sm transition">My Results & Feedback</button>
+                </div>
+
+                <!-- TAB: QUESTIONS (EXAMINER) -->
+                <div x-show="activeTab === 'questions' && (role === 'examiner' || role === 'admin')">
+                    <div class="bg-white rounded-xl shadow p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4">Create New Question</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="text-sm font-medium">Subject</label>
+                                <input type="text" x-model="qForm.subject" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Question Type</label>
+                                <select x-model="qForm.question_type" class="w-full mt-1 border rounded p-2 text-sm bg-white">
+                                    <option value="mcq">MCQ (Single Choice)</option>
+                                    <option value="multi_select">Multi-Select</option>
+                                    <option value="short_answer">Short Answer</option>
+                                    <option value="long_answer">Long Answer</option>
+                                    <option value="image_upload">Image / Handwritten Upload</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Difficulty</label>
+                                <select x-model="qForm.difficulty" class="w-full mt-1 border rounded p-2 text-sm bg-white">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="text-sm font-medium">Question Text</label>
+                            <textarea x-model="qForm.question_text" rows="3" class="w-full mt-1 border rounded p-2 text-sm"></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4" x-show="qForm.question_type === 'mcq' || qForm.question_type === 'multi_select'">
+                            <div>
+                                <label class="text-sm font-medium">Options (Comma separated)</label>
+                                <input type="text" x-model="qForm.optionsStr" placeholder="Option A, Option B, Option C" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Correct Answer Index/Indices (e.g. 0 or [0,2])</label>
+                                <input type="text" x-model="qForm.correctStr" placeholder="0" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="mb-4" x-show="qForm.question_type !== 'mcq' && qForm.question_type !== 'multi_select'">
+                            <label class="text-sm font-medium">Model Answer (Rubric for AI Evaluation)</label>
+                            <textarea x-model="qForm.model_answer" rows="2" class="w-full mt-1 border rounded p-2 text-sm" placeholder="Key points required for grading..."></textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="text-sm font-medium">Marks</label>
+                                <input type="number" x-model.number="qForm.marks" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Negative Marks</label>
+                                <input type="number" x-model.number="qForm.negative_marks" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <button @click="createQuestion()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-semibold">Save Question</button>
+                    </div>
+
+                    <!-- Question List Table -->
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="px-6 py-4 border-b font-bold">Existing Questions (<span x-text="questions.length"></span>)</div>
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100 text-xs text-gray-600 uppercase">
+                                    <th class="p-3">ID</th>
+                                    <th class="p-3">Subject</th>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3">Question</th>
+                                    <th class="p-3">Marks</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="q in questions" :key="q.id">
+                                    <tr>
+                                        <td class="p-3 font-medium" x-text="q.id"></td>
+                                        <td class="p-3" x-text="q.subject"></td>
+                                        <td class="p-3 uppercase text-xs font-semibold bg-gray-50 rounded" x-text="q.question_type"></td>
+                                        <td class="p-3 truncate max-w-xs" x-text="q.question_text"></td>
+                                        <td class="p-3 font-semibold" x-text="q.marks"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB: EXAMS (EXAMINER) -->
+                <div x-show="activeTab === 'exams' && (role === 'examiner' || role === 'admin')">
+                    <div class="bg-white rounded-xl shadow p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4">Configure New Exam</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="text-sm font-medium">Exam Title</label>
+                                <input type="text" x-model="eForm.title" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Subject</label>
+                                <input type="text" x-model="eForm.subject" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="text-sm font-medium">Description</label>
+                            <textarea x-model="eForm.description" rows="2" class="w-full mt-1 border rounded p-2 text-sm"></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="text-sm font-medium">Duration (Minutes)</label>
+                                <input type="number" x-model.number="eForm.duration_minutes" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Start Time</label>
+                                <input type="datetime-local" x-model="eForm.start_time" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">End Time</label>
+                                <input type="datetime-local" x-model="eForm.end_time" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="text-sm font-medium">Total Marks</label>
+                                <input type="number" x-model.number="eForm.total_marks" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Passing Marks</label>
+                                <input type="number" x-model.number="eForm.passing_marks" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">Tab Switch Warning Limit</label>
+                                <input type="number" x-model.number="eForm.tab_switch_limit" class="w-full mt-1 border rounded p-2 text-sm">
+                            </div>
+                        </div>
+
+                        <!-- Question selection checkbox list -->
+                        <div class="mb-4">
+                            <label class="text-sm font-medium block mb-2">Select Questions for Exam (<span x-text="eForm.question_ids.length"></span> selected)</label>
+                            <div class="max-h-48 overflow-y-auto border rounded p-3 space-y-2 bg-gray-50">
+                                <template x-for="q in questions" :key="q.id">
+                                    <label class="flex items-center space-x-3 text-sm">
+                                        <input type="checkbox" :value="q.id" @change="toggleQuestionSelection(q.id)" class="rounded text-indigo-600">
+                                        <span class="font-medium" x-text="'[' + q.subject + '] ' + q.question_text"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+
+                        <button @click="createExam()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-semibold">Publish Exam</button>
+                    </div>
+
+                    <!-- Exams List Table -->
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="px-6 py-4 border-b font-bold">Scheduled Exams (<span x-text="exams.length"></span>)</div>
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100 text-xs text-gray-600 uppercase">
+                                    <th class="p-3">ID</th>
+                                    <th class="p-3">Title</th>
+                                    <th class="p-3">Subject</th>
+                                    <th class="p-3">Duration</th>
+                                    <th class="p-3">Questions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y text-sm">
+                                <template x-for="ex in exams" :key="ex.id">
+                                    <tr>
+                                        <td class="p-3 font-medium" x-text="ex.id"></td>
+                                        <td class="p-3 font-semibold" x-text="ex.title"></td>
+                                        <td class="p-3" x-text="ex.subject"></td>
+                                        <td class="p-3" x-text="ex.duration_minutes + ' mins'"></td>
+                                        <td class="p-3" x-text="ex.questions.length"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB: GRADING QUEUE (EXAMINER) -->
+                <div x-show="activeTab === 'grading' && (role === 'examiner' || role === 'admin')">
+                    <div class="bg-white rounded-xl shadow p-6">
+                        <h3 class="text-lg font-bold mb-4">AI Subjective Grading Queue (Pending Review)</h3>
+                        <div class="space-y-6">
+                            <template x-for="ans in pendingGrading" :key="ans.answer_id">
+                                <div class="border rounded-xl p-5 bg-gray-50 space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs uppercase bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded font-semibold" x-text="ans.question_type"></span>
+                                        <span class="text-xs text-gray-500" x-text="'Answer ID: ' + ans.answer_id"></span>
+                                    </div>
+                                    <p class="font-medium text-gray-800" x-text="'Q: ' + ans.question_text"></p>
+                                    <div class="bg-white p-3 rounded border text-sm">
+                                        <strong class="text-gray-700">Student Answer:</strong>
+                                        <p class="text-gray-900 mt-1" x-text="JSON.stringify(ans.submitted_answer)"></p>
+                                    </div>
+                                    <div class="bg-indigo-50 p-3 rounded border border-indigo-100 text-sm">
+                                        <strong class="text-indigo-900">AI Evaluation & Justification (Pre-filled):</strong>
+                                        <p class="text-indigo-800 mt-1" x-text="'Suggested Score: ' + ans.ai_score + ' | ' + ans.ai_justification"></p>
+                                    </div>
+                                    <div class="flex items-center space-x-4 pt-2">
+                                        <div>
+                                            <label class="text-xs font-medium text-gray-600">Examiner Score</label>
+                                            <input type="number" x-model.number="ans.examiner_score" class="mt-1 border rounded p-1.5 text-sm w-28">
+                                        </div>
+                                        <div class="flex-1">
+                                            <label class="text-xs font-medium text-gray-600">Examiner Feedback</label>
+                                            <input type="text" x-model="ans.examiner_feedback" placeholder="Optional comments..." class="mt-1 border rounded p-1.5 text-sm w-full">
+                                        </div>
+                                        <button @click="submitGrade(ans.answer_id, ans.examiner_score, ans.examiner_feedback)" class="mt-5 bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-semibold">Submit Grade</button>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="pendingGrading.length === 0" class="text-center py-8 text-gray-500">
+                                No pending subjective answers in the grading queue.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: STUDENT EXAMS -->
+                <div x-show="activeTab === 'student_exams' && role === 'student'">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <template x-for="ex in exams" :key="ex.id">
+                            <div class="bg-white rounded-xl shadow p-6 border border-gray-100 flex flex-col justify-between">
+                                <div>
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-xs font-semibold uppercase bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded" x-text="ex.subject"></span>
+                                        <span class="text-xs text-gray-500" x-text="ex.duration_minutes + ' Minutes'"></span>
+                                    </div>
+                                    <h3 class="text-xl font-bold text-gray-800 mb-2" x-text="ex.title"></h3>
+                                    <p class="text-gray-600 text-sm mb-4" x-text="ex.description || 'No description provided.'"></p>
+                                </div>
+                                <button @click="startExam(ex.id)" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition flex items-center justify-center space-x-2">
+                                    <i class="fa-solid fa-play"></i>
+                                    <span>Start Secure Exam</span>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- TAB: STUDENT RESULTS -->
+                <div x-show="activeTab === 'student_results' && role === 'student'">
+                    <div class="space-y-6">
+                        <template x-for="res in studentResults" :key="res.session_id">
+                            <div class="bg-white rounded-xl shadow p-6 border border-gray-100">
+                                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800" x-text="res.exam_title"></h3>
+                                        <span class="text-xs text-gray-500" x-text="'Session ID: ' + res.session_id"></span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-xl font-bold" x-text="res.total_score + ' / ' + res.max_marks"></span>
+                                        <div class="text-xs font-semibold px-2.5 py-0.5 rounded inline-block mt-1" :class="res.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" x-text="res.passed ? 'PASSED' : 'FAILED'"></div>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <template x-for="ans in res.answers" :key="ans.answer_id">
+                                        <div class="bg-gray-50 p-3 rounded border text-sm space-y-1">
+                                            <div class="flex justify-between">
+                                                <span class="font-medium text-gray-800" x-text="ans.question_text"></span>
+                                                <span class="font-bold text-indigo-600" x-text="(ans.examiner_score !== null ? ans.examiner_score : ans.ai_score || 0) + ' marks'"></span>
+                                            </div>
+                                            <p class="text-gray-600 text-xs" x-text="'Your Answer: ' + JSON.stringify(ans.submitted_answer)"></p>
+                                            <p class="text-green-700 text-xs italic" x-show="ans.examiner_feedback" x-text="'Examiner Feedback: ' + ans.examiner_feedback"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+            </div>
+        </template>
+
+        <!-- SECURE EXAM RUNNER MODAL / VIEW -->
+        <div x-show="examActive" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex flex-col p-6 overflow-y-auto">
+            <div class="max-w-4xl mx-auto w-full bg-white rounded-2xl shadow-2xl flex flex-col flex-1 p-6 relative">
+
+                <!-- Exam Header Bar -->
+                <div class="flex justify-between items-center border-b pb-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800" x-text="activeExamTitle"></h2>
+                        <span class="text-xs text-gray-500" x-text="'Session Token: ' + activeSessionToken"></span>
+                    </div>
+                    <div class="flex items-center space-x-6">
+                        <!-- Countdown Timer -->
+                        <div class="bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl text-indigo-900 font-mono font-bold text-lg flex items-center space-x-2">
+                            <i class="fa-solid fa-clock"></i>
+                            <span x-text="timerDisplay"></span>
+                        </div>
+                        <!-- Proctoring Status Indicator -->
+                        <div class="bg-red-50 border border-red-200 px-3 py-2 rounded-xl text-red-700 text-xs font-semibold flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                            <span x-text="'AI Proctor Active (Suspicion: ' + Math.round(suspicionScore) + '%)'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webcam preview box -->
+                <div class="absolute top-20 right-6 w-36 h-28 bg-black rounded-lg overflow-hidden border-2 border-indigo-500 shadow-md flex items-center justify-center">
+                    <video id="webcamPreview" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+                    <span class="absolute bottom-1 left-1 bg-red-600 text-white text-[10px] px-1 rounded">LIVE AI</span>
+                </div>
+
+                <!-- Question Area -->
+                <div class="flex-1 space-y-6 overflow-y-auto pr-4 mb-6">
+                    <template x-for="(q, index) in activeQuestions" :key="q.id">
+                        <div class="bg-gray-50 border rounded-xl p-5 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-indigo-600" x-text="'Question ' + (index + 1) + ' (' + q.marks + ' Marks)'"></span>
+                                <span class="text-xs uppercase bg-gray-200 px-2 py-0.5 rounded font-semibold" x-text="q.question_type"></span>
+                            </div>
+                            <p class="font-medium text-gray-900 text-base" x-text="q.question_text"></p>
+
+                            <!-- MCQ Options -->
+                            <div class="space-y-2 pt-2" x-show="q.question_type === 'mcq'">
+                                <template x-for="(opt, optIdx) in q.options" :key="optIdx">
+                                    <label class="flex items-center space-x-3 p-2.5 rounded-lg bg-white border cursor-pointer hover:bg-indigo-50 transition">
+                                        <input type="radio" :name="'q_' + q.id" :value="optIdx" x-model.number="studentAnswers[q.id]" class="text-indigo-600">
+                                        <span class="text-sm text-gray-800" x-text="opt"></span>
+                                    </label>
+                                </template>
+                            </div>
+
+                            <!-- Short / Long Answer -->
+                            <div class="pt-2" x-show="q.question_type === 'short_answer' || q.question_type === 'long_answer'">
+                                <textarea x-model="studentAnswers[q.id]" rows="4" placeholder="Type your answer here..." class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 bg-white"></textarea>
+                                <span class="text-xs text-gray-500" x-text="'Word count: ' + (studentAnswers[q.id] ? studentAnswers[q.id].trim().split(/\s+/).length : 0)"></span>
+                            </div>
+
+                            <!-- Image / Handwritten Upload -->
+                            <div class="pt-2" x-show="q.question_type === 'image_upload'">
+                                <input type="text" x-model="studentAnswers[q.id]" placeholder="Enter image URL or uploaded file path..." class="w-full border rounded-lg p-2.5 text-sm bg-white mb-2">
+                                <p class="text-xs text-gray-500">Simulated camera capture or file upload zone.</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="border-t pt-4 flex justify-end">
+                    <button @click="submitExam()" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition flex items-center space-x-2">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Final Submit Exam</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        function app() {
+            return {
+                token: localStorage.getItem('token') || '',
+                role: localStorage.getItem('role') || 'student',
+                username: localStorage.getItem('username') || '',
+                isRegister: false,
+                activeTab: 'questions',
+                authForm: { username: '', loginId: '', password: '', role: 'student' },
+                errorMessage: '',
+
+                questions: [],
+                exams: [],
+                pendingGrading: [],
+                studentResults: [],
+
+                qForm: {
+                    subject: 'Computer Science',
+                    difficulty: 'medium',
+                    question_type: 'mcq',
+                    question_text: '',
+                    optionsStr: '',
+                    correctStr: '0',
+                    model_answer: '',
+                    marks: 5.0,
+                    negative_marks: 1.0
+                },
+
+                eForm: {
+                    title: '',
+                    description: '',
+                    subject: 'Computer Science',
+                    duration_minutes: 30,
+                    start_time: new Date().toISOString().slice(0, 16),
+                    end_time: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+                    passing_marks: 40.0,
+                    total_marks: 100.0,
+                    tab_switch_limit: 3,
+                    question_ids: []
+                },
+
+                // Exam Runner State
+                examActive: false,
+                activeExamId: null,
+                activeSessionId: null,
+                activeSessionToken: '',
+                activeExamTitle: '',
+                activeQuestions: [],
+                studentAnswers: {},
+                timerDisplay: '00:00',
+                timerInterval: null,
+                heartbeatInterval: null,
+                suspicionScore: 0.0,
+                tabSwitchCount: 0,
+
+                init() {
+                    if (this.token) {
+                        this.loadData();
+                    }
+                    // Anti-cheat event listeners for tab switches / blurs
+                    window.addEventListener('blur', () => {
+                        if (this.examActive) {
+                            this.tabSwitchCount++;
+                            this.suspicionScore = Math.min(100, this.suspicionScore + 15);
+                            this.logProctorEvent('tab_switch', 'Window lost focus / tab switched');
+                        }
+                    });
+                },
+
+                async submitAuth() {
+                    this.errorMessage = '';
+                    try {
+                        if (this.isRegister) {
+                            const res = await fetch('/api/auth/register', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    username: this.authForm.username,
+                                    email: this.authForm.loginId,
+                                    password: this.authForm.password,
+                                    role: this.authForm.role
+                                })
+                            });
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.detail || 'Registration failed');
+                            }
+                            const data = await res.json();
+                            this.setAuth(data);
+                        } else {
+                            const formData = new URLSearchParams();
+                            formData.append('username', this.authForm.loginId);
+                            formData.append('password', this.authForm.password);
+
+                            const res = await fetch('/api/auth/login', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: formData
+                            });
+                            if (!res.ok) {
+                                throw new Error('Invalid username or password');
+                            }
+                            const data = await res.json();
+                            this.setAuth(data);
+                        }
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                    }
+                },
+
+                setAuth(data) {
+                    this.token = data.access_token;
+                    this.role = data.role;
+                    this.username = data.username;
+                    localStorage.setItem('token', this.token);
+                    localStorage.setItem('role', this.role);
+                    localStorage.setItem('username', this.username);
+                    this.loadData();
+                },
+
+                logout() {
+                    localStorage.clear();
+                    this.token = '';
+                    this.role = 'student';
+                    this.username = '';
+                    this.examActive = false;
+                },
+
+                async loadData() {
+                    const headers = { 'Authorization': 'Bearer ' + this.token };
+                    try {
+                        const qRes = await fetch('/api/questions/', { headers });
+                        if (qRes.ok) this.questions = await qRes.json();
+
+                        const eRes = await fetch('/api/exams/', { headers });
+                        if (eRes.ok) this.exams = await eRes.json();
+
+                        if (this.role === 'examiner' || this.role === 'admin') {
+                            const gRes = await fetch('/api/grading/pending', { headers });
+                            if (gRes.ok) this.pendingGrading = await gRes.json();
+                        }
+
+                        if (this.role === 'student') {
+                            // Load results for completed exams
+                            this.studentResults = [];
+                        }
+                    } catch (e) {
+                        console.error('Error loading data', e);
+                    }
+                },
+
+                async createQuestion() {
+                    let opts = null;
+                    let corr = null;
+                    if (this.qForm.question_type === 'mcq' || this.qForm.question_type === 'multi_select') {
+                        opts = this.qForm.optionsStr.split(',').map(s => s.trim());
+                        try {
+                            corr = JSON.parse(this.qForm.correctStr);
+                        } catch {
+                            corr = this.qForm.correctStr;
+                        }
+                    }
+                    const payload = {
+                        subject: this.qForm.subject,
+                        difficulty: this.qForm.difficulty,
+                        question_type: this.qForm.question_type,
+                        question_text: this.qForm.question_text,
+                        options: opts,
+                        correct_options: corr,
+                        model_answer: this.qForm.model_answer,
+                        marks: this.qForm.marks,
+                        negative_marks: this.qForm.negative_marks
+                    };
+                    const res = await fetch('/api/questions/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                        alert('Question created successfully!');
+                        this.loadData();
+                    } else {
+                        alert('Failed to create question');
+                    }
+                },
+
+                toggleQuestionSelection(qId) {
+                    const idx = this.eForm.question_ids.indexOf(qId);
+                    if (idx > -1) {
+                        this.eForm.question_ids.splice(idx, 1);
+                    } else {
+                        this.eForm.question_ids.push(qId);
+                    }
+                },
+
+                async createExam() {
+                    const payload = {
+                        ...this.eForm,
+                        start_time: new Date(this.eForm.start_time).toISOString(),
+                        end_time: new Date(this.eForm.end_time).toISOString()
+                    };
+                    const res = await fetch('/api/exams/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                        alert('Exam published successfully!');
+                        this.loadData();
+                    } else {
+                        alert('Failed to publish exam');
+                    }
+                },
+
+                async startExam(examId) {
+                    const res = await fetch(`/api/sessions/start/${examId}`, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + this.token }
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        alert(err.detail || 'Could not start exam session');
+                        return;
+                    }
+                    const data = await res.json();
+                    this.activeSessionId = data.session_id;
+                    this.activeSessionToken = data.session_token;
+                    this.activeExamTitle = "Exam Session #" + data.exam_id;
+                    this.activeQuestions = data.questions;
+                    this.studentAnswers = {};
+                    this.examActive = true;
+                    this.suspicionScore = 0.0;
+                    this.tabSwitchCount = 0;
+
+                    // Start timer (duration in minutes)
+                    let totalSeconds = data.duration_minutes * 60;
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = setInterval(() => {
+                        totalSeconds--;
+                        if (totalSeconds <= 0) {
+                            clearInterval(this.timerInterval);
+                            this.submitExam();
+                        }
+                        const m = Math.floor(totalSeconds / 60);
+                        const s = totalSeconds % 60;
+                        this.timerDisplay = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    }, 1000);
+
+                    // Start webcam stream for proctoring
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(stream => {
+                        const video = document.getElementById('webcamPreview');
+                        if (video) video.srcObject = stream;
+                    }).catch(err => console.log('Webcam not accessible:', err));
+
+                    // Start 10-second proctor heartbeat
+                    clearInterval(this.heartbeatInterval);
+                    this.heartbeatInterval = setInterval(() => {
+                        this.sendHeartbeat();
+                    }, 10000);
+                },
+
+                async logProctorEvent(eventType, details) {
+                    if (!this.activeSessionId) return;
+                    await fetch(`/api/proctor/heartbeat/${this.activeSessionId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                        body: JSON.stringify({
+                            suspicion_increment: 5.0,
+                            events: [{ event_type: eventType, details: details }]
+                        })
+                    });
+                },
+
+                async sendHeartbeat() {
+                    if (!this.activeSessionId) return;
+                    try {
+                        const res = await fetch(`/api/proctor/heartbeat/${this.activeSessionId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                            body: JSON.stringify({
+                                suspicion_increment: 2.0,
+                                events: []
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.suspicionScore = data.suspicion_score;
+                            if (data.warning_flag) {
+                                console.warn("Proctor warning triggered:", data.action);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Heartbeat error', e);
+                    }
+                },
+
+                async submitExam() {
+                    clearInterval(this.timerInterval);
+                    clearInterval(this.heartbeatInterval);
+
+                    const answersList = Object.keys(this.studentAnswers).map(qId => ({
+                        question_id: parseInt(qId),
+                        submitted_answer: this.studentAnswers[qId]
+                    }));
+
+                    const res = await fetch(`/api/sessions/submit/${this.activeSessionId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                        body: JSON.stringify({ answers: answersList })
+                    });
+
+                    this.examActive = false;
+                    if (res.ok) {
+                        const data = await res.json();
+                        alert(`Exam submitted successfully! Score: ${data.total_score} / ${data.max_marks}`);
+                        // Load result details
+                        const resDetail = await fetch(`/api/sessions/result/${this.activeSessionId}`, {
+                            headers: { 'Authorization': 'Bearer ' + this.token }
+                        });
+                        if (resDetail.ok) {
+                            const rData = await resDetail.json();
+                            this.studentResults.unshift(rData);
+                            this.activeTab = 'student_results';
+                        }
+                    } else {
+                        alert('Submission failed or timed out.');
+                    }
+                },
+
+                async submitGrade(answerId, score, feedback) {
+                    const res = await fetch(`/api/grading/answer/${answerId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token },
+                        body: JSON.stringify({ examiner_score: score, examiner_feedback: feedback })
+                    });
+                    if (res.ok) {
+                        alert('Grade saved successfully!');
+                        this.loadData();
+                    } else {
+                        alert('Failed to save grade');
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
